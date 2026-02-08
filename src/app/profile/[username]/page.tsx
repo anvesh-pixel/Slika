@@ -1,81 +1,103 @@
-"use client";
+import { currentUser as getClerkUser, auth } from "@clerk/nextjs/server";
+import prisma from "@/lib/prisma";
+import ProfileClient from "@/components/profile-client";
+import { notFound } from "next/navigation";
 
-import React from "react";
-import { useParams } from "next/navigation";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Feed from "@/components/feed";
+export default async function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
+    const { username } = await params;
+    const authUser = await getClerkUser();
+    const { userId } = await auth();
 
-export default function ProfilePage() {
-    const params = useParams();
-    const username = params.username as string;
+    // Fetch user from our DB
+    let profileUser = await prisma.user.findUnique({
+        where: { username },
+        include: {
+            pins: {
+                orderBy: { createdAt: "desc" }
+            },
+            saves: {
+                include: { pin: true }
+            },
+            likes: {
+                include: { pin: true }
+            }
+        }
+    });
 
-    // In a real app, you'd fetch user data based on the username
-    const displayName = username.charAt(0).toUpperCase() + username.slice(1);
-    const handle = `@${username.toLowerCase()}`;
+    const isOwnProfile = userId && (
+        authUser?.username === username ||
+        authUser?.firstName?.toLowerCase()?.replace(/\s+/g, '_') === username ||
+        (username === 'me')
+    );
+
+    if (!profileUser) {
+        if (isOwnProfile && authUser) {
+            // Lazy sync: create the user in our DB if it's the own profile
+            try {
+                profileUser = await prisma.user.create({
+                    data: {
+                        id: authUser.id,
+                        username: authUser.username || authUser.firstName?.toLowerCase()?.replace(/\s+/g, '_') || `user_${authUser.id.slice(-6)}`,
+                        email: authUser.emailAddresses[0]?.emailAddress || "",
+                        avatarUrl: authUser.imageUrl,
+                    },
+                    include: {
+                        pins: true,
+                        saves: { include: { pin: true } },
+                        likes: { include: { pin: true } }
+                    }
+                });
+            } catch (error) {
+                console.error("Failed to lazy-sync user:", error);
+            }
+        } else {
+            return notFound();
+        }
+    }
+
+    const displayName = profileUser?.username || username.charAt(0).toUpperCase() + username.slice(1);
+
+    const stats = {
+        posts: profileUser?.pins.length || 0,
+        followers: 0,
+        following: 0
+    };
+
+    const createdItems = (profileUser as any)?.pins?.map((pin: any) => ({
+        id: pin.id,
+        type: pin.type as "image" | "video",
+        url: pin.imageUrl,
+        title: pin.title,
+        height: 600
+    })) || [];
+
+    const savedItems = (profileUser as any)?.saves?.map((save: any) => ({
+        id: save.pin.id,
+        type: save.pin.type as "image" | "video",
+        url: save.pin.imageUrl,
+        title: save.pin.title,
+        height: 600
+    })) || [];
+
+    const likedItems = (profileUser as any)?.likes?.map((like: any) => ({
+        id: like.pin.id,
+        type: like.pin.type as "image" | "video",
+        url: like.pin.imageUrl,
+        title: like.pin.title,
+        height: 600
+    })) || [];
 
     return (
-        <div className="min-h-screen bg-black text-white">
-            <div className="max-w-7xl mx-auto px-4 pt-16">
-                {/* Header Section */}
-                <div className="flex flex-col items-center text-center space-y-6 mb-12">
-                    <div className="relative group">
-                        <div className="absolute -inset-1 bg-neon-gradient rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-                        <Avatar className="h-[120px] w-[120px] border-4 border-black relative">
-                            <AvatarImage src="https://github.com/shadcn.png" alt={displayName} />
-                            <AvatarFallback className="bg-white/10">{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                    </div>
-
-                    <div className="space-y-1">
-                        <h1 className="text-4xl font-bold tracking-tight text-white">{displayName}</h1>
-                        <p className="text-gray-400 font-medium text-lg">{handle}</p>
-                    </div>
-
-                    <div className="flex items-center gap-3 text-sm font-semibold text-gray-400">
-                        <span>0 followers</span>
-                        <div className="h-1 w-1 bg-gray-600 rounded-full"></div>
-                        <span>0 following</span>
-                    </div>
-
-                    <div className="flex items-center gap-4 pt-2">
-                        <Button variant="secondary" className="glass-dark rounded-full px-8 font-bold text-white hover:bg-white/20 border-white/10 h-11">
-                            Share
-                        </Button>
-                        <Button variant="secondary" className="glass-dark rounded-full px-8 font-bold text-white hover:bg-white/20 border-white/10 h-11">
-                            Edit Profile
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Tabs Section */}
-                <Tabs defaultValue="created" className="w-full">
-                    <div className="flex justify-center border-b border-white/10 mb-8">
-                        <TabsList className="bg-transparent h-12 gap-12">
-                            <TabsTrigger
-                                value="created"
-                                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-4 data-[state=active]:border-neon-purple rounded-none h-full px-4 font-bold text-lg text-gray-400 data-[state=active]:text-white transition-all"
-                            >
-                                Created
-                            </TabsTrigger>
-                            <TabsTrigger
-                                value="saved"
-                                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-4 data-[state=active]:border-neon-pink rounded-none h-full px-4 font-bold text-lg text-gray-400 data-[state=active]:text-white transition-all"
-                            >
-                                Saved
-                            </TabsTrigger>
-                        </TabsList>
-                    </div>
-
-                    <TabsContent value="created" className="mt-0 focus-visible:outline-none">
-                        <Feed variant="created" />
-                    </TabsContent>
-                    <TabsContent value="saved" className="mt-0 focus-visible:outline-none">
-                        <Feed variant="saved" />
-                    </TabsContent>
-                </Tabs>
-            </div>
-        </div>
+        <ProfileClient
+            username={profileUser?.username || username}
+            displayName={displayName}
+            bio={profileUser?.bio || "No bio yet. Tap edit to share your story. ✨"}
+            avatarUrl={profileUser?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`}
+            stats={stats}
+            isOwnProfile={!!isOwnProfile}
+            createdItems={createdItems}
+            savedItems={savedItems}
+            likedItems={likedItems}
+        />
     );
 }
