@@ -151,9 +151,21 @@ export async function addComment(pinId: number, content: string) {
             content,
             userId,
             pinId
+        },
+        include: {
+            user: {
+                select: {
+                    id: true,
+                    username: true,
+                    avatarUrl: true
+                }
+            }
         }
     });
 
     revalidatePath(`/pin/${pinId}`);
-    return comment;
+    return {
+        ...comment,
+        createdAt: comment.createdAt.toISOString()
+    };
 }

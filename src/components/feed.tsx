@@ -11,6 +11,8 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import LongPressRadialMenu from "./radial-menu";
+import { toggleLike, toggleSave } from "@/app/actions/interaction";
+import { useTransition } from "react";
 
 type FeedItem =
     | { type: "image"; id: number; height: number; url: string; title: string }
@@ -138,6 +140,7 @@ function VideoFeedItem({ id, url, title }: { id: number; url: string; title: str
         showDropdown,
         setShowDropdown
     } = useLongPressMobile();
+    const [isPending, startTransition] = useTransition();
 
     const handleMouseEnter = () => {
         videoRef.current?.play().catch(() => { });
@@ -148,6 +151,11 @@ function VideoFeedItem({ id, url, title }: { id: number; url: string; title: str
     };
 
     const handleAction = (actionId: string) => {
+        if (actionId === "like") {
+            startTransition(() => toggleLike(id));
+        } else if (actionId === "save") {
+            startTransition(() => toggleSave(id));
+        }
         console.log(`Action: ${actionId} for video ${id}`);
         setShowDropdown(false);
     };
@@ -157,7 +165,7 @@ function VideoFeedItem({ id, url, title }: { id: number; url: string; title: str
             <Link
                 href={`/pin/${id}`}
                 onClick={(e) => { if (isLongPressing) e.preventDefault(); }}
-                className={`group relative cursor-pointer overflow-hidden rounded-xl bg-white/5 border border-white/10 transition-all duration-500 hover:border-neon-purple/50 hover:shadow-[0_0_20px_rgba(157,0,255,0.2)] active:scale-95 block h-full ${isLongPressing ? 'pointer-events-none' : ''}`}
+                className={`group relative cursor-pointer overflow-hidden rounded-xl bg-background-alt border border-border transition-all duration-500 hover:border-neon-purple/20 hover:shadow-[0_0_10px_rgba(157,0,255,0.05)] dark:hover:border-neon-purple/30 dark:hover:shadow-[0_0_15px_rgba(157,0,255,0.15)] active:scale-95 block h-full ${isLongPressing ? 'pointer-events-none' : ''}`}
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
             >
@@ -169,10 +177,10 @@ function VideoFeedItem({ id, url, title }: { id: number; url: string; title: str
                     playsInline
                     className="w-full h-auto transition-transform duration-700 group-hover:scale-110"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-end p-4">
-                    <span className="text-white font-medium text-sm truncate drop-shadow-md">{title}</span>
+                <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-end p-4">
+                    <span className="text-foreground font-medium text-sm truncate drop-shadow-md">{title}</span>
                 </div>
-                <div className="absolute top-3 right-3 glass-dark rounded-full p-1.5 text-white opacity-80 group-hover:opacity-0 transition-opacity">
+                <div className="absolute top-3 right-3 glass rounded-full p-1.5 text-foreground opacity-80 group-hover:opacity-0 transition-opacity">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                         <path d="M16 3a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3zM9 13H2V3h7v10zm7-10v10l-6-5 6-5z" />
                     </svg>
@@ -185,7 +193,7 @@ function VideoFeedItem({ id, url, title }: { id: number; url: string; title: str
                     <DropdownMenuTrigger asChild>
                         <button
                             type="button"
-                            className="h-10 w-10 glass-dark rounded-full flex items-center justify-center text-white active:scale-90 transition-all touch-none select-none border border-neon-purple/30 outline-none"
+                            className="h-10 w-10 glass rounded-full flex items-center justify-center text-foreground active:scale-90 transition-all touch-none select-none border border-neon-purple/30 outline-none"
                             onTouchStart={handleTouchStart}
                             onTouchEnd={handleTouchEnd}
                             onTouchMove={handleTouchMove}
@@ -204,14 +212,14 @@ function VideoFeedItem({ id, url, title }: { id: number; url: string; title: str
                             <MoreHorizontal className="h-5 w-5" />
                         </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="glass-dark border-neon-purple/30 text-white min-w-[150px]" align="end" sideOffset={8}>
+                    <DropdownMenuContent className="glass border-neon-purple/30 text-foreground min-w-[150px]" align="end" sideOffset={8}>
                         <DropdownMenuItem onClick={() => handleAction("save")} className="focus:bg-white/10 focus:text-neon-purple gap-2 cursor-pointer">
                             <Bookmark className="h-4 w-4" /> Save
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleAction("download")} className="focus:bg-white/10 focus:text-neon-purple gap-2 cursor-pointer">
                             <Download className="h-4 w-4" /> Download
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleAction("like")} className="focus:bg-white/10 focus:text-neon-pink gap-2 cursor-pointer">
+                        <DropdownMenuItem onClick={() => handleAction("like")} className="focus:bg-white/10 focus:text-red-500 gap-2 cursor-pointer">
                             <Heart className="h-4 w-4" /> Like
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleAction("share")} className="focus:bg-white/10 focus:text-green-500 gap-2 cursor-pointer">
@@ -243,8 +251,14 @@ function ImageFeedItem({ id, url, title, height }: { id: number; url: string; ti
         showDropdown,
         setShowDropdown
     } = useLongPressMobile();
+    const [isPending, startTransition] = useTransition();
 
     const handleAction = (actionId: string) => {
+        if (actionId === "like") {
+            startTransition(() => toggleLike(id));
+        } else if (actionId === "save") {
+            startTransition(() => toggleSave(id));
+        }
         console.log(`Action: ${actionId} for item ${id}`);
         setShowDropdown(false);
     };
@@ -254,7 +268,7 @@ function ImageFeedItem({ id, url, title, height }: { id: number; url: string; ti
             <Link
                 href={`/pin/${id}`}
                 onClick={(e) => { if (isLongPressing) e.preventDefault(); }}
-                className={`group relative cursor-pointer overflow-hidden rounded-xl bg-white/5 border border-white/10 transition-all duration-500 hover:border-neon-pink/50 hover:shadow-[0_0_20px_rgba(255,0,234,0.2)] active:scale-95 block h-full ${isLongPressing ? 'pointer-events-none' : ''}`}
+                className={`group relative cursor-pointer overflow-hidden rounded-xl bg-background-alt border border-border transition-all duration-500 hover:border-neon-pink/20 hover:shadow-[0_0_10px_rgba(255,0,234,0.05)] dark:hover:border-neon-pink/30 dark:hover:shadow-[0_0_15px_rgba(255,0,234,0.15)] active:scale-95 block h-full ${isLongPressing ? 'pointer-events-none' : ''}`}
             >
                 <img
                     src={url}
@@ -264,8 +278,8 @@ function ImageFeedItem({ id, url, title, height }: { id: number; url: string; ti
                     className="w-full h-auto transition-transform duration-700 group-hover:scale-110"
                     loading="lazy"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-end p-4">
-                    <span className="text-white font-medium text-sm truncate drop-shadow-md">{title}</span>
+                <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-end p-4">
+                    <span className="text-foreground font-medium text-sm truncate drop-shadow-md">{title}</span>
                 </div>
             </Link>
 
@@ -275,7 +289,7 @@ function ImageFeedItem({ id, url, title, height }: { id: number; url: string; ti
                     <DropdownMenuTrigger asChild>
                         <button
                             type="button"
-                            className="h-10 w-10 glass-dark rounded-full flex items-center justify-center text-white active:scale-90 transition-all touch-none select-none border border-neon-pink/30 outline-none"
+                            className="h-10 w-10 glass rounded-full flex items-center justify-center text-foreground active:scale-90 transition-all touch-none select-none border border-neon-pink/30 outline-none"
                             onTouchStart={handleTouchStart}
                             onTouchEnd={handleTouchEnd}
                             onTouchMove={handleTouchMove}
@@ -293,17 +307,17 @@ function ImageFeedItem({ id, url, title, height }: { id: number; url: string; ti
                             <MoreHorizontal className="h-5 w-5" />
                         </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="glass-dark border-neon-pink/30 text-white min-w-[150px]" align="end" sideOffset={8}>
-                        <DropdownMenuItem onClick={() => handleAction("save")} className="focus:bg-white/10 focus:text-neon-purple gap-2 cursor-pointer">
+                    <DropdownMenuContent className="glass border-neon-pink/30 text-foreground min-w-[150px]" align="end" sideOffset={8}>
+                        <DropdownMenuItem onClick={() => handleAction("save")} className="focus:bg-muted focus:text-neon-purple gap-2 cursor-pointer">
                             <Bookmark className="h-4 w-4" /> Save
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleAction("download")} className="focus:bg-white/10 focus:text-neon-purple gap-2 cursor-pointer">
+                        <DropdownMenuItem onClick={() => handleAction("download")} className="focus:bg-muted focus:text-neon-purple gap-2 cursor-pointer">
                             <Download className="h-4 w-4" /> Download
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleAction("like")} className="focus:bg-white/10 focus:text-neon-pink gap-2 cursor-pointer">
+                        <DropdownMenuItem onClick={() => handleAction("like")} className="focus:bg-muted focus:text-neon-pink gap-2 cursor-pointer">
                             <Heart className="h-4 w-4" /> Like
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleAction("share")} className="focus:bg-white/10 focus:text-green-500 gap-2 cursor-pointer">
+                        <DropdownMenuItem onClick={() => handleAction("share")} className="focus:bg-muted focus:text-green-500 gap-2 cursor-pointer">
                             <Share2 className="h-4 w-4" /> Share
                         </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -335,20 +349,20 @@ export default function Feed({
     if (items.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 px-4 text-center space-y-6 animate-in fade-in duration-700">
-                <div className="h-24 w-24 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-4">
+                <div className="h-24 w-24 rounded-full bg-background-alt border border-border flex items-center justify-center mb-4 transition-colors duration-[2000ms]">
                     {variant === "created" ? (
-                        <Grid className="h-10 w-10 text-gray-500" />
+                        <Grid className="h-10 w-10 text-muted-foreground" />
                     ) : variant === "liked" ? (
-                        <Heart className="h-10 w-10 text-gray-500" />
+                        <Heart className="h-10 w-10 text-muted-foreground" />
                     ) : (
-                        <Bookmark className="h-10 w-10 text-gray-500" />
+                        <Bookmark className="h-10 w-10 text-muted-foreground" />
                     )}
                 </div>
                 <div className="space-y-2">
-                    <h3 className="text-2xl font-bold text-white">
+                    <h3 className="text-2xl font-bold text-foreground">
                         {variant === "created" ? "Nothing here yet" : variant === "liked" ? "No liked pins" : "No saved pins"}
                     </h3>
-                    <p className="text-gray-500 max-w-sm mx-auto">
+                    <p className="text-muted-foreground max-w-sm mx-auto">
                         {variant === "created"
                             ? "Start creating and sharing your inspiration with the world."
                             : variant === "liked"

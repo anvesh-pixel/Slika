@@ -52,3 +52,70 @@ export async function createPin(formData: {
 
     return pin;
 }
+
+export async function getSearchPins(query: string, types?: string[]) {
+    const where: any = {};
+
+    if (query) {
+        where.OR = [
+            { title: { contains: query, mode: "insensitive" } },
+            { description: { contains: query, mode: "insensitive" } },
+        ];
+    }
+
+    if (types && types.length > 0) {
+        const dbTypes = types.map(t => t === 'photo' ? 'image' : t);
+        where.type = { in: dbTypes };
+    }
+
+    const pins = await prisma.pin.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        include: {
+            user: true,
+        },
+    });
+
+    return pins.map((pin) => ({
+        id: pin.id,
+        type: pin.type as "image" | "video",
+        url: pin.imageUrl,
+        title: pin.title,
+        height: 600, // Default height for layout
+        user: {
+            username: pin.user.username,
+            avatarUrl: pin.user.avatarUrl,
+        }
+    }));
+}
+
+export async function getPins({ take = 40, types }: { take?: number, types?: string[] } = {}) {
+    const where: any = {};
+
+    if (types && types.length > 0) {
+        const dbTypes = types.map(t => t === 'photo' ? 'image' : t);
+        where.type = { in: dbTypes };
+    }
+
+    const pins = await prisma.pin.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take,
+        include: {
+            user: true,
+        },
+    });
+
+    return pins.map((pin) => ({
+        id: pin.id,
+        type: pin.type as "image" | "video",
+        url: pin.imageUrl,
+        title: pin.title,
+        height: 600,
+        user: {
+            username: pin.user.username,
+            avatarUrl: pin.user.avatarUrl,
+        }
+    }));
+}

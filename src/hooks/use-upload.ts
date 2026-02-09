@@ -16,11 +16,16 @@ export function useUpload() {
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
             const filePath = `uploads/${fileName}`;
 
+            const bucketName = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || "slika-uploads";
+
             const { data, error: uploadError } = await supabase.storage
-                .from("slika-uploads")
+                .from(bucketName)
                 .upload(filePath, file);
 
+            console.log("Supabase upload result:", { data, error: uploadError });
+
             if (uploadError) {
+                console.error("Supabase storage error:", uploadError);
                 throw uploadError;
             }
 

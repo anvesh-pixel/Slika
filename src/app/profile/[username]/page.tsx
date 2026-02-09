@@ -8,96 +8,142 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
     const authUser = await getClerkUser();
     const { userId } = await auth();
 
-    // Fetch user from our DB
+    // Fetch user from our DB with follower counts
     let profileUser = await prisma.user.findUnique({
         where: { username },
-        include: {
+        select: {
+            id: true,
+            username: true,
+            displayName: true,
+            bio: true,
+            avatarUrl: true,
             pins: {
-                orderBy: { createdAt: "desc" }
+                orderBy: { createdAt: "desc" },
             },
             saves: {
-                include: { pin: true }
+                include: { pin: true },
             },
             likes: {
-                include: { pin: true }
+                include: { pin: true },
+            },
+            _count: {
+                select: {
+                    followers: true,
+                    following: true,
+                }
             }
         }
     });
 
-    const isOwnProfile = userId && (
+    // Determine if this is the user's own profile based on Clerk userId
+    // This needs to be done before the notFound check, as we might lazy-sync
+    const isOwnProfileCheck = userId && (
         authUser?.username === username ||
         authUser?.firstName?.toLowerCase()?.replace(/\s+/g, '_') === username ||
         (username === 'me')
     );
 
     if (!profileUser) {
-        if (isOwnProfile && authUser) {
+        if (isOwnProfileCheck && authUser) {
             // Lazy sync: create the user in our DB if it's the own profile
             try {
                 profileUser = await prisma.user.create({
                     data: {
                         id: authUser.id,
                         username: authUser.username || authUser.firstName?.toLowerCase()?.replace(/\s+/g, '_') || `user_${authUser.id.slice(-6)}`,
+                        displayName: `${authUser.firstName || ""} ${authUser.lastName || ""}`.trim() || authUser.username || "Anonymous",
                         email: authUser.emailAddresses[0]?.emailAddress || "",
                         avatarUrl: authUser.imageUrl,
                     },
-                    include: {
-                        pins: true,
-                        saves: { include: { pin: true } },
-                        likes: { include: { pin: true } }
+                    select: { // Use select here to match the type of profileUser above
+                        id: true,
+                        username: true,
+                        displayName: true,
+                        bio: true,
+                        avatarUrl: true,
+                        pins: {
+                            orderBy: { createdAt: "desc" },
+                        },
+                        saves: {
+                            include: { pin: true },
+                        },
+                        likes: {
+                            include: { pin: true },
+                        },
+                        _count: {
+                            select: {
+                                followers: true,
+                                following: true,
+                            }
+                        }
                     }
                 });
             } catch (error) {
                 console.error("Failed to lazy-sync user:", error);
+                return notFound(); // If lazy sync fails, treat as not found
             }
         } else {
             return notFound();
         }
     }
 
-    const displayName = profileUser?.username || username.charAt(0).toUpperCase() + username.slice(1);
+    // If profileUser is still null after potential lazy sync, it's a 404
+    if (!profileUser) {
+        return notFound();
+    }
 
-    const stats = {
-        posts: profileUser?.pins.length || 0,
-        followers: 0,
-        following: 0
+    // Check if current user follows this profile
+    const isFollowing = userId ? !!(await prisma.follow.findUnique({
+        where: {
+            followerId_followingId: {
+                followerId: userId,
+                followingId: profileUser.id,
+            }
+        }
+    })) : false;
+
+    // Re-evaluate isOwnProfile based on the actual profileUser.id
+    const isOwnProfile = userId === profileUser.id;
+
+    const profileData = {
+        username: (profileUser as any).username || "",
+        displayName: (profileUser as any).displayName || (profileUser as any).username || "User",
+        bio: (profileUser as any).bio || "No bio yet. Tap edit to share your story. ✨",
+        avatarUrl: (profileUser as any).avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${(profileUser as any).username}`,
+        userId: (profileUser as any).id,
+        stats: {
+            posts: (profileUser as any).pins.length,
+            followers: (profileUser as any)._count.followers,
+            following: (profileUser as any)._count.following,
+        },
+        isOwnProfile,
+        isFollowing,
+        createdItems: (profileUser as any).pins.map((p: any) => ({
+            id: p.id,
+            type: p.type as "image" | "video",
+            url: p.imageUrl,
+            title: p.title,
+            height: 600
+        })),
+        savedItems: (profileUser as any).saves.map((s: any) => ({
+            id: s.pin.id,
+            type: s.pin.type as "image" | "video",
+            url: s.pin.imageUrl,
+            title: s.pin.title,
+            height: 600
+        })),
+        likedItems: (profileUser as any).likes.map((l: any) => ({
+            id: l.pin.id,
+            type: l.pin.type as "image" | "video",
+            url: l.pin.imageUrl,
+            title: l.pin.title,
+            height: 600
+        })),
     };
 
-    const createdItems = (profileUser as any)?.pins?.map((pin: any) => ({
-        id: pin.id,
-        type: pin.type as "image" | "video",
-        url: pin.imageUrl,
-        title: pin.title,
-        height: 600
-    })) || [];
-
-    const savedItems = (profileUser as any)?.saves?.map((save: any) => ({
-        id: save.pin.id,
-        type: save.pin.type as "image" | "video",
-        url: save.pin.imageUrl,
-        title: save.pin.title,
-        height: 600
-    })) || [];
-
-    const likedItems = (profileUser as any)?.likes?.map((like: any) => ({
-        id: like.pin.id,
-        type: like.pin.type as "image" | "video",
-        url: like.pin.imageUrl,
-        title: like.pin.title,
-        height: 600
-    })) || [];
-
     return (
-        <ProfileClient
-            username={profileUser?.username || username}
-            displayName={displayName}
-            bio={profileUser?.bio || "No bio yet. Tap edit to share your story. ✨"}
-            avatarUrl={profileUser?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`}
-            stats={stats}
-            isOwnProfile={!!isOwnProfile}
-            createdItems={createdItems}
-            savedItems={savedItems}
-            likedItems={likedItems}
-        />
+        <main className="min-h-screen bg-background transition-colors duration-[2000ms]">
+            <ProfileClient {...profileData} />
+        </main>
     );
 }

@@ -1,0 +1,199 @@
+/* Custom Navbar Filter Styles based on User Design */
+
+.theme-popup {
+    /* total */
+    --total_text_color: #e0e0e0;
+    --total_font_family: inherit;
+    /* button */
+    --btn_bg: rgba(255, 255, 255, 0.05);
+    --btn_padding: 0.7em 1.25em;
+    --btn_height: 2.75rem;
+    --btn_border_radius: 9999px;
+    --btn_outline_width: 0.0625em;
+    --btn_outline_color: #9b4dff;
+    --btn_outline_offset: 0.0625em;
+    --btn_gap: 0.5em;
+    /* list */
+    --list_padding: 0.5em;
+    --list_bg: #1a1a1a;
+    --list_border_radius: 1em;
+    --list_gap: 0.1875em;
+    --list_btn_hover_bg: rgba(255, 255, 255, 0.1);
+    --list_btn_active: rgba(155, 77, 255, 0.2);
+    --list_btn_border_radius: 0.5em;
+    --list_btn_padding: 0.5em 1.25em;
+    --list_btn_gap: 0.5em;
+    --list_btn_outline_width: 1px;
+    --list_btn_outline_color: #9b4dff;
+    --list_offset: 0.5em;
+    --list_btn_font_size: 13px;
+    --list_position_left: unset;
+    --list_position_right: 0;
+}
+
+/* Light mode adjustments */
+:global(.light) .theme-popup {
+    --total_text_color: #111111;
+    --btn_bg: rgba(0, 0, 0, 0.05);
+    --list_bg: #ffffff;
+    --list_btn_hover_bg: rgba(0, 0, 0, 0.04);
+    --btn_outline_color: #9d00ff;
+}
+
+:global(.light) .theme-popup__button {
+    border-color: rgba(0, 0, 0, 0.15);
+    color: #1a1a1a;
+}
+
+:global(.light) .theme-popup__icons {
+    color: #1a1a1a;
+}
+
+.theme-popup__button .theme-popup__icons svg,
+.theme-popup input[type="radio"],
+.theme-popup input[type="checkbox"],
+.theme-popup__list-container {
+    display: none;
+}
+
+.theme-popup {
+    color: var(--total_text_color);
+    font-family: var(--total_font_family);
+    position: relative;
+    user-select: none;
+}
+
+.theme-popup__list-container {
+    position: absolute;
+    left: var(--list_position_left);
+    right: var(--list_position_right);
+    top: calc(var(--btn_height) + var(--list_offset));
+    z-index: 100;
+}
+
+.theme-popup__icons {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+}
+
+.theme-popup__button {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    background-color: transparent;
+    cursor: pointer;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s;
+    outline: none;
+}
+
+.theme-popup__button svg {
+    height: 16px;
+    fill: #777777;
+    transition: all 0.3s;
+}
+
+:global(.dark) .theme-popup__button {
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark) .theme-popup__button svg {
+    fill: #a0a0a0;
+}
+
+.theme-popup__button:hover {
+    box-shadow: 0px 10px 15px rgba(157, 0, 255, 0.15);
+    background-color: #3b3b3b;
+    border-color: #9d00ff;
+}
+
+:global(.light) .theme-popup__button:hover {
+    background-color: #1a1a1a;
+}
+
+.theme-popup__button:hover svg {
+    fill: white;
+}
+
+:global(.dark) .theme-popup__button {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.theme-popup__list {
+    margin: 0;
+    list-style-type: none;
+    padding: var(--list_padding);
+    border-radius: var(--list_border_radius);
+    background-color: var(--list_bg);
+    display: flex;
+    flex-direction: column;
+    row-gap: var(--list_gap);
+    border: 1px solid rgba(155, 77, 255, 0.2);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 0 15px rgba(157, 0, 255, 0.1);
+}
+
+.theme-popup__list label {
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    column-gap: var(--list_btn_gap);
+    padding: var(--list_btn_padding);
+    border-radius: var(--list_btn_border_radius);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.theme-popup__list label span {
+    font-size: var(--list_btn_font_size);
+    font-weight: 600;
+}
+
+/* Actions logic via CSS classes (controlled by React) */
+
+#checkbox:checked~.theme-popup__button {
+    outline: var(--btn_outline_width) solid var(--btn_outline_color);
+    outline-offset: var(--btn_outline_offset);
+    background-color: var(--list_btn_hover_bg);
+}
+
+#checkbox:checked~.theme-popup__list-container {
+    display: block;
+    animation: popupIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popupIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.theme-popup__list label:hover,
+.theme-popup__button:hover {
+    background-color: var(--list_btn_hover_bg);
+}
+
+/* Selected state simulations */
+.theme-popup .is-selected {
+    background-color: var(--list_btn_active) !important;
+    outline: var(--list_btn_outline_width) solid var(--list_btn_outline_color);
+}
+
+.theme-popup .is-active svg {
+    display: block !important;
+    color: #ff00ea;
+}

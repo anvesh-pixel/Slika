@@ -2,9 +2,11 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Camera, Save } from "lucide-react";
+import { X, Camera, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { updateProfile } from "@/app/actions/user";
+import { useRouter } from "next/navigation";
 
 interface EditProfileDialogProps {
     isOpen: boolean;
@@ -19,11 +21,32 @@ interface EditProfileDialogProps {
 
 export default function EditProfileDialog({ isOpen, onClose, initialData }: EditProfileDialogProps) {
     const [formData, setFormData] = useState(initialData);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const router = useRouter();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Saving profile data:", formData);
-        onClose();
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            await updateProfile({
+                displayName: formData.displayName,
+                username: formData.username,
+                bio: formData.bio,
+            });
+            router.refresh();
+            // If username changed, we might need to redirect
+            if (formData.username !== initialData.username) {
+                router.push(`/profile/${formData.username}`);
+            }
+            onClose();
+        } catch (err: any) {
+            setError(err.message || "Failed to update profile");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -103,20 +126,31 @@ export default function EditProfileDialog({ isOpen, onClose, initialData }: Edit
                                 </div>
                             </div>
 
+                            {error && (
+                                <p className="text-red-500 text-sm font-bold text-center">{error}</p>
+                            )}
+
                             <div className="flex items-center gap-4 pt-4">
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     onClick={onClose}
+                                    disabled={isLoading}
                                     className="flex-1 rounded-full h-12 font-bold text-gray-400 hover:text-white"
                                 >
                                     Cancel
                                 </Button>
                                 <Button
                                     type="submit"
+                                    disabled={isLoading}
                                     className="flex-1 bg-neon-purple hover:bg-neon-purple/80 text-white rounded-full h-12 font-bold transition-all shadow-[0_0_20px_rgba(157,0,255,0.3)]"
                                 >
-                                    <Save className="mr-2 h-5 w-5" /> Save Changes
+                                    {isLoading ? (
+                                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                    ) : (
+                                        <Save className="mr-2 h-5 w-5" />
+                                    )}
+                                    {isLoading ? "Saving..." : "Save Changes"}
                                 </Button>
                             </div>
                         </form>

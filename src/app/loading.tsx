@@ -5,10 +5,10 @@ import { motion } from "framer-motion";
 
 export default function Loading() {
     return (
-        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black overflow-hidden">
+        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background overflow-hidden transition-colors duration-[2000ms]">
             {/* Background Ambient Glows */}
-            <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-purple-600/10 blur-[120px] rounded-full" />
-            <div className="absolute bottom-[40%] left-1/2 -translate-x-1/2 translate-y-1/2 w-[400px] h-[400px] bg-pink-600/10 blur-[100px] rounded-full" />
+            <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-purple-600/10 dark:bg-purple-600/20 blur-[120px] rounded-full" />
+            <div className="absolute bottom-[40%] left-1/2 -translate-x-1/2 translate-y-1/2 w-[400px] h-[400px] bg-pink-600/10 dark:bg-pink-600/20 blur-[100px] rounded-full" />
 
             <div className="relative flex flex-col items-center gap-12">
                 {/* Slika Logo - High Visibility Design */}
@@ -18,8 +18,8 @@ export default function Loading() {
                     transition={{ duration: 1, ease: "easeOut" }}
                     className="relative text-center"
                 >
-                    {/* Main Text: Using simple white for absolute visibility */}
-                    <h1 className="text-7xl sm:text-9xl font-black tracking-[0.1em] text-white drop-shadow-[0_0_15px_rgba(157,0,255,0.7)]">
+                    {/* Main Text: Using theme-aware foreground */}
+                    <h1 className="text-7xl sm:text-9xl font-black tracking-[0.1em] text-foreground drop-shadow-[0_0_15px_rgba(157,0,255,0.7)]">
                         SLIKA
                     </h1>
 
@@ -33,7 +33,7 @@ export default function Loading() {
                 </motion.div>
 
                 {/* Minimalist Loading Bar */}
-                <div className="w-48 h-[2px] bg-white/10 rounded-full overflow-hidden relative">
+                <div className="w-48 h-[2px] bg-border/20 rounded-full overflow-hidden relative">
                     <motion.div
                         initial={{ left: "-100%" }}
                         animate={{ left: "100%" }}
@@ -42,7 +42,7 @@ export default function Loading() {
                             repeat: Infinity,
                             ease: "easeInOut"
                         }}
-                        className="absolute top-0 bottom-0 w-1/2 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                        className="absolute top-0 bottom-0 w-1/2 bg-gradient-to-r from-transparent via-foreground/20 to-transparent"
                     />
                 </div>
 
@@ -54,14 +54,14 @@ export default function Loading() {
                     className="flex items-center gap-3"
                 >
                     <span className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_#9d00ff]" />
-                    <p className="text-white/50 text-[10px] font-bold uppercase tracking-[0.3em]">
+                    <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.3em]">
                         Initializing Environment
                     </p>
                 </motion.div>
             </div>
 
             {/* Modern Grid Overlay (Optional Subtle Visual) */}
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,var(--foreground)03_1px,transparent_1px),linear-gradient(to_bottom,var(--foreground)03_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none opacity-10" />
         </div>
     );
 }

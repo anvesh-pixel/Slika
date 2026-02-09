@@ -7,16 +7,14 @@ import {
     ChevronLeft,
     MoreHorizontal,
     Share2,
+    Heart,
+    Download,
     MessageCircle,
+    Send,
     Play,
     Pause,
     Volume2,
     VolumeX,
-    Heart,
-    Download,
-    Bookmark,
-    Send,
-    Grid
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -29,6 +27,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { toggleLike, toggleSave, addComment } from "@/app/actions/interaction";
+import "./like-button.css";
 
 interface Comment {
     id: number;
@@ -69,29 +68,46 @@ export default function PinClient({
 }: PinClientProps) {
     const router = useRouter();
     const videoRef = useRef<HTMLVideoElement>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    // Layout & Media States
+    const [aspectRatio, setAspectRatio] = useState<number>(0); // width / height
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(true);
+    const [progress, setProgress] = useState(0);
+    const [duration, setDuration] = useState(0);
+
+    // Interaction States
     const [isLiked, setIsLiked] = useState(initialIsLiked);
     const [isSaved, setIsSaved] = useState(initialIsSaved);
     const [comments, setComments] = useState<Comment[]>(initialComments);
     const [commentText, setCommentText] = useState("");
     const [isPending, startTransition] = useTransition();
-    const [progress, setProgress] = useState(0);
-    const [duration, setDuration] = useState(0);
 
     const displayName = pin.user.username || "Anonymous";
     const authorAvatar = pin.user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${pin.user.id}`;
 
+    // Sync comments when initialComments changes (from server revalidation)
+    useEffect(() => {
+        setComments(initialComments);
+    }, [initialComments]);
+
+    // Video Logic
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
         const handleTimeUpdate = () => {
-            setProgress((video.currentTime / video.duration) * 100);
+            if (video) {
+                setProgress((video.currentTime / video.duration) * 100);
+            }
         };
 
         const handleLoadedMetadata = () => {
-            setDuration(video.duration);
+            if (video) {
+                setDuration(video.duration);
+                setAspectRatio(video.videoWidth / video.videoHeight);
+            }
         };
 
         video.addEventListener("timeupdate", handleTimeUpdate);
@@ -101,15 +117,17 @@ export default function PinClient({
             video.removeEventListener("timeupdate", handleTimeUpdate);
             video.removeEventListener("loadedmetadata", handleLoadedMetadata);
         };
-    }, []);
+    }, [pin.type]);
+
+    const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        const img = e.currentTarget;
+        setAspectRatio(img.naturalWidth / img.naturalHeight);
+    };
 
     const togglePlay = () => {
         if (videoRef.current) {
-            if (isPlaying) {
-                videoRef.current.pause();
-            } else {
-                videoRef.current.play();
-            }
+            if (isPlaying) videoRef.current.pause();
+            else videoRef.current.play();
             setIsPlaying(!isPlaying);
         }
     };
@@ -121,21 +139,14 @@ export default function PinClient({
         }
     };
 
-    const handleSliderChange = (value: number[]) => {
-        if (videoRef.current) {
-            const newTime = (value[0] / 100) * duration;
-            videoRef.current.currentTime = newTime;
-            setProgress(value[0]);
-        }
-    };
-
+    // Actions
     const handleLike = () => {
         startTransition(async () => {
             setIsLiked(!isLiked);
             try {
                 await toggleLike(pin.id);
             } catch (error) {
-                setIsLiked(isLiked); // Rollback
+                setIsLiked(isLiked);
                 console.error("Like failed:", error);
             }
         });
@@ -147,15 +158,15 @@ export default function PinClient({
             try {
                 await toggleSave(pin.id);
             } catch (error) {
-                setIsSaved(isSaved); // Rollback
+                setIsSaved(isSaved);
                 console.error("Save failed:", error);
             }
         });
     };
 
-    const handleAddComment = async (e?: React.FormEvent) => {
-        e?.preventDefault();
-        if (!commentText.trim()) return;
+    const handleAddComment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!commentText.trim() || isPending) return;
 
         const content = commentText;
         setCommentText("");
@@ -163,32 +174,43 @@ export default function PinClient({
         startTransition(async () => {
             try {
                 const newComment = await addComment(pin.id, content);
-                // The comment will be re-fetched by Server Component due to revalidatePath
-                // But we can optimistically update or let the refresh handle it.
-                // Since revalidatePath is used, the parent will pass new initialComments.
+                setComments(prev => [newComment as any, ...prev]);
+                scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (error) {
                 console.error("Comment failed:", error);
             }
         });
     };
 
+    // Layout Decision: Ratio > 1.2 is Landscape
+    const isLandscape = aspectRatio > 1.2;
+
     return (
-        <div className="min-h-screen bg-black flex items-center justify-center p-0 md:p-8 font-sans">
-            <div className="max-w-7xl w-full md:glass-dark md:rounded-[40px] overflow-hidden shadow-2xl flex flex-col md:flex-row min-h-screen md:min-h-[750px] md:border md:border-white/5 relative">
+        <div className="min-h-screen bg-background text-foreground font-sans transition-colors duration-[2000ms]">
+            {/* Top Navigation Bar (Minimal) */}
+            <div className="fixed top-0 left-0 right-0 z-50 p-6 pointer-events-none">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full bg-background-alt/40 backdrop-blur-xl text-foreground hover:bg-background-alt/60 w-12 h-12 border border-border pointer-events-auto shadow-sm"
+                    onClick={() => router.back()}
+                >
+                    <ChevronLeft className="h-6 w-6" />
+                </Button>
+            </div>
 
-                {/* Left Column: Media Section */}
-                <div className="md:w-[55%] lg:w-[60%] bg-[#0a0a0a] flex items-center justify-center relative overflow-hidden group">
-                    <div
-                        className="absolute inset-0 opacity-20 blur-3xl scale-150 pointer-events-none"
-                        style={{
-                            backgroundImage: `url(${pin.imageUrl})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center'
-                        }}
-                    />
+            <main className={cn(
+                "w-full max-w-screen-2xl mx-auto flex flex-col md:p-8 pt-24",
+                isLandscape ? "lg:flex-col items-center" : "lg:flex-row lg:items-start lg:justify-center gap-12"
+            )}>
 
+                {/* Media Section */}
+                <div className={cn(
+                    "relative flex items-center justify-center bg-background-alt/30 rounded-[2rem] overflow-hidden group transition-all duration-700",
+                    isLandscape ? "w-full max-w-5xl aspect-video mb-12" : "w-full lg:w-[600px] xl:w-[700px] aspect-[4/5] md:aspect-auto"
+                )}>
                     {pin.type === "video" ? (
-                        <div className="relative w-full h-full flex items-center justify-center z-10">
+                        <div className="w-full h-full flex items-center justify-center relative cursor-pointer" onClick={togglePlay}>
                             <video
                                 ref={videoRef}
                                 src={pin.imageUrl}
@@ -196,200 +218,232 @@ export default function PinClient({
                                 muted={isMuted}
                                 loop
                                 playsInline
-                                className="max-w-full max-h-[85vh] md:max-h-full object-contain pointer-events-auto shadow-2xl"
+                                className="w-full h-full object-contain"
                                 onPlay={() => setIsPlaying(true)}
                                 onPause={() => setIsPlaying(false)}
-                                onClick={togglePlay}
                             />
 
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-6 md:p-10 space-y-4 font-bold">
-                                <div className="flex items-center gap-4">
-                                    <Slider
-                                        value={[progress]}
-                                        max={100}
-                                        step={0.1}
-                                        onValueChange={handleSliderChange}
-                                        className="flex-1 cursor-pointer"
-                                    />
-                                    <span className="text-[10px] font-bold text-white/70 w-8 tabular-nums">
-                                        {Math.floor(videoRef.current?.currentTime || 0)}s
-                                    </span>
-                                </div>
-
+                            {/* Minimalism Video Controls */}
+                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] flex flex-col gap-3 p-4 rounded-3xl bg-black/20 backdrop-blur-xl border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <Slider
+                                    value={[progress]}
+                                    max={100}
+                                    step={0.1}
+                                    onValueChange={(v) => {
+                                        if (videoRef.current) {
+                                            videoRef.current.currentTime = (v[0] / 100) * duration;
+                                            setProgress(v[0]);
+                                        }
+                                    }}
+                                    className="cursor-pointer"
+                                />
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <button onClick={togglePlay} className="p-2 text-white hover:scale-110 transition-transform">
-                                            {isPlaying ? <Pause className="h-6 w-6 fill-white" /> : <Play className="h-6 w-6 fill-white" />}
+                                    <div className="flex items-center gap-4">
+                                        <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="text-white">
+                                            {isPlaying ? <Pause className="h-5 w-5 fill-white" /> : <Play className="h-5 w-5 fill-white" />}
                                         </button>
-                                        <button onClick={toggleMute} className="p-2 text-white hover:scale-110 transition-transform">
-                                            {isMuted ? <VolumeX className="h-6 w-6" /> : <Volume2 className="h-6 w-6" />}
+                                        <button onClick={(e) => { e.stopPropagation(); toggleMute(); }} className="text-white">
+                                            {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                                         </button>
                                     </div>
+                                    <span className="text-[10px] font-black text-white/50 bg-white/10 px-2 py-1 rounded-md">
+                                        {Math.floor(videoRef.current?.currentTime || 0)}S / {Math.floor(duration)}S
+                                    </span>
                                 </div>
                             </div>
                         </div>
                     ) : (
-                        <div className="relative z-10 p-4 md:p-8 flex items-center justify-center w-full h-full">
-                            <img
-                                src={pin.imageUrl}
-                                alt={pin.title}
-                                className="max-w-full max-h-[85vh] md:max-h-[700px] object-contain rounded-2xl md:rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-transform duration-700 hover:scale-[1.02] active:scale-100"
-                                loading="eager"
-                            />
-                        </div>
+                        <img
+                            src={pin.imageUrl}
+                            alt={pin.title}
+                            onLoad={handleImageLoad}
+                            className="w-full h-full object-contain rounded-[2rem] hover:scale-[1.01] transition-transform duration-700"
+                        />
                     )}
-
-                    <div className="absolute top-6 left-6 z-20">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="rounded-full bg-black/20 backdrop-blur-md text-white hover:bg-white/10 w-12 h-12 border border-white/5"
-                            onClick={() => router.back()}
-                        >
-                            <ChevronLeft className="h-7 w-7" />
-                        </Button>
-                    </div>
                 </div>
 
-                {/* Right Column: Interaction Panel */}
-                <div className="md:w-[45%] lg:w-[40%] flex flex-col h-full bg-black md:bg-transparent relative z-20">
-                    <div className="flex items-center justify-between p-6 md:p-8 border-b border-white/5 bg-black/20 backdrop-blur-md font-bold">
+                {/* Details Section (The Embed) */}
+                <div className={cn(
+                    "flex flex-col bg-background-alt/20 lg:bg-transparent p-8 md:p-0 min-h-screen md:min-h-0",
+                    isLandscape ? "w-full max-w-3xl" : "w-full lg:w-[450px] shrink-0 sticky top-24"
+                )}>
+                    {/* Primary Actions Row */}
+                    <div className="flex items-center justify-between mb-10 pb-6 border-b border-border/10">
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={handleLike}
-                                disabled={isPending}
-                                className={cn(
-                                    "flex items-center justify-center p-3 rounded-full transition-all active:scale-75",
-                                    isLiked ? "text-neon-pink bg-white/5 shadow-[0_0_15px_rgba(255,0,234,0.3)]" : "text-white hover:bg-white/10"
-                                )}
-                            >
-                                <Heart className={cn("h-6 w-6", isLiked ? "fill-neon-pink" : "")} />
-                            </button>
-                            <button className="p-3 text-white hover:bg-white/10 rounded-full transition-all">
-                                <Download className="h-6 w-6" />
-                            </button>
-                            <button className="p-3 text-white hover:bg-white/10 rounded-full transition-all">
-                                <Share2 className="h-6 w-6" />
-                            </button>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/10 h-10 w-10">
-                                        <MoreHorizontal className="h-5 w-5" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="glass-dark border-white/10 text-white min-w-[180px]">
-                                    <DropdownMenuItem className="hover:bg-white/10 cursor-pointer py-3 px-4 text-red-400 font-bold">
-                                        Report Pin
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                            <Button
-                                className={cn(
-                                    "rounded-full font-black px-8 h-12 transition-all shadow-lg text-base",
-                                    isSaved ? "bg-white text-black" : "bg-neon-gradient text-white hover:opacity-90"
-                                )}
-                                onClick={handleSave}
-                                disabled={isPending}
-                            >
-                                {isSaved ? "Saved" : "Save"}
-                            </Button>
-                        </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto px-6 md:px-10 py-8 space-y-10 custom-scrollbar">
-                        <div className="space-y-4">
-                            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white leading-[1.1]">
-                                {pin.title}
-                            </h1>
-                            <p className="text-gray-400 leading-relaxed text-base md:text-lg font-bold opacity-80">
-                                {pin.description || "No description provided."}
-                            </p>
-                        </div>
-
-                        <div className="flex items-center justify-between py-6 border-y border-white/5">
-                            <Link href={`/profile/${pin.user.username}`} className="flex items-center gap-4 group/author cursor-pointer">
-                                <Avatar className="h-14 w-14 border-2 border-white/10 group-hover/author:border-neon-purple transition-all duration-300 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
-                                    <AvatarImage src={authorAvatar} />
-                                    <AvatarFallback className="bg-white/10 text-white font-bold">{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
-                                </Avatar>
-                                <div>
-                                    <p className="font-black text-white text-lg group-hover/author:text-neon-purple transition-colors">{displayName}</p>
-                                    <p className="text-xs text-gray-500 font-black uppercase tracking-[0.2em]">Collector</p>
+                            <div className="con-like shrink-0">
+                                <input
+                                    className="like"
+                                    type="checkbox"
+                                    title="like"
+                                    checked={isLiked}
+                                    onChange={handleLike}
+                                    disabled={isPending}
+                                />
+                                <div className="checkmark">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="outline" viewBox="0 0 24 24">
+                                        <path d="M17.5,1.917a6.4,6.4,0,0,0-5.5,3.3,6.4,6.4,0,0,0-5.5-3.3A6.8,6.8,0,0,0,0,8.967c0,4.547,4.786,9.513,8.8,12.88a4.974,4.974,0,0,0,6.4,0C19.214,18.48,24,13.514,24,8.967A6.8,6.8,0,0,0,17.5,1.917Zm-3.585,18.4a2.973,2.973,0,0,1-3.83,0C4.947,16.006,2,11.87,2,8.967a4.8,4.8,0,0,1,4.5-5.05A4.8,4.8,0,0,1,11,8.967a1,1,0,0,0,2,0,4.8,4.8,0,0,1,4.5-5.05A4.8,4.8,0,0,1,22,8.967C22,11.87,19.053,16.006,13.915,20.313Z"></path>
+                                    </svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="filled" viewBox="0 0 24 24">
+                                        <path d="M17.5,1.917a6.4,6.4,0,0,0-5.5,3.3,6.4,6.4,0,0,0-5.5-3.3A6.8,6.8,0,0,0,0,8.967c0,4.547,4.786,9.513,8.8,12.88a4.974,4.974,0,0,0,6.4,0C19.214,18.48,24,13.514,24,8.967A6.8,6.8,0,0,0,17.5,1.917Z"></path>
+                                    </svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" height="100" width="100" className="celebrate">
+                                        <polygon className="poly" points="10,10 20,20"></polygon>
+                                        <polygon className="poly" points="10,50 20,50"></polygon>
+                                        <polygon className="poly" points="20,80 30,70"></polygon>
+                                        <polygon className="poly" points="90,10 80,20"></polygon>
+                                        <polygon className="poly" points="90,50 80,50"></polygon>
+                                        <polygon className="poly" points="80,80 70,70"></polygon>
+                                    </svg>
                                 </div>
-                            </Link>
-                            {!isOwnPin && (
-                                <Button
-                                    variant="outline"
-                                    className="rounded-full font-black border-white/10 text-white hover:bg-white hover:text-black hover:border-white h-11 px-8 transition-all active:scale-95"
-                                >
-                                    Follow
-                                </Button>
-                            )}
-                        </div>
-
-                        {/* Comments Section */}
-                        <div className="space-y-8 pb-10">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-xl font-black tracking-tight text-white/90">Discussion</h3>
-                                <span className="text-gray-500 font-black text-sm uppercase tracking-widest">{comments.length} Comments</span>
                             </div>
-
-                            {comments.length > 0 ? (
-                                <div className="space-y-8">
-                                    {comments.map((comment) => (
-                                        <div key={comment.id} className="flex gap-4 group/comment">
-                                            <Avatar className="h-10 w-10 shrink-0 border border-white/5 transition-transform group-hover/comment:scale-105">
-                                                <AvatarImage src={comment.user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user.id}`} />
-                                                <AvatarFallback className="bg-white/5 text-white text-xs">{comment.user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                                            </Avatar>
-                                            <div className="flex-1 space-y-1">
-                                                <div className="flex items-center justify-between">
-                                                    <p className="text-sm font-black text-white hover:text-neon-purple transition-colors cursor-pointer">{comment.user.username}</p>
-                                                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">
-                                                        {new Date(comment.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                                    </p>
-                                                </div>
-                                                <p className="text-sm text-gray-300 leading-relaxed font-bold opacity-90">{comment.content}</p>
-                                            </div>
-                                        </div>
-                                    ))}
+                            <span className={cn("text-sm font-black transition-colors duration-300", isLiked ? "text-red-500" : "text-foreground")}>
+                                {isLiked ? 'Liked' : 'Like'}
+                            </span>
+                            <div className="flex items-center gap-2 ml-2">
+                                <button className="p-3 bg-foreground/5 hover:bg-foreground/10 text-foreground rounded-2xl transition-all">
+                                    <Share2 className="h-5 w-5" />
+                                </button>
+                                <button className="p-3 bg-foreground/5 hover:bg-foreground/10 text-foreground rounded-2xl transition-all">
+                                    <Download className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+                        <label className="relative shrink-0 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={isSaved}
+                                onChange={handleSave}
+                                disabled={isPending}
+                                className="peer hidden"
+                            />
+                            <div className={cn(
+                                "group flex w-fit items-center gap-2 overflow-hidden rounded-full border border-foreground p-2 px-5 font-black text-foreground transition-all active:scale-90",
+                                "peer-checked:bg-foreground peer-checked:text-background",
+                                isPending && "opacity-50 pointer-events-none"
+                            )}>
+                                <div className="z-10 transition group-hover:translate-x-4 uppercase tracking-tighter text-sm">
+                                    {isSaved ? "Saved" : "Save"}
                                 </div>
+                                <svg
+                                    className={cn(
+                                        "size-6 transition group-hover:-translate-x-6 group-hover:-translate-y-3 group-hover:scale-[750%] duration-500",
+                                        isSaved ? "fill-current" : "fill-none"
+                                    )}
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 24 24"
+                                    strokeWidth="1.5"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"
+                                    />
+                                </svg>
+                            </div>
+                        </label>
+                    </div>
+
+                    {/* Metadata */}
+                    <div className="space-y-6 mb-12">
+                        <h1 className="text-4xl md:text-5xl font-black tracking-tighter leading-none text-foreground">
+                            {pin.title}
+                        </h1>
+                        <p className="text-lg text-muted-foreground font-bold leading-relaxed opacity-70">
+                            {pin.description || "No description provided."}
+                        </p>
+                    </div>
+
+                    {/* Author Section */}
+                    <div className="flex items-center justify-between p-4 bg-foreground/5 rounded-3xl mb-12 border border-border/5">
+                        <Link href={`/profile/${pin.user.username}`} className="flex items-center gap-3">
+                            <Avatar className="h-12 w-12 border-2 border-background shadow-lg">
+                                <AvatarImage src={authorAvatar} />
+                                <AvatarFallback className="bg-muted text-foreground font-black">{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <p className="font-black text-foreground text-base tracking-tight">{displayName}</p>
+                                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-50">Content Creator</p>
+                            </div>
+                        </Link>
+                        {!isOwnPin && (
+                            <Button
+                                variant="outline"
+                                className="rounded-2xl font-black border-border/10 text-sm hover:bg-foreground hover:text-background h-10 px-6"
+                            >
+                                Follow
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Comments Thread */}
+                    <div className="flex-1 min-h-[300px] flex flex-col">
+                        <div className="flex items-center justify-between mb-8">
+                            <h3 className="text-xl font-black text-foreground tracking-tight">Discussion</h3>
+                            <div className="flex items-center gap-1.5 px-3 py-1 bg-foreground/5 rounded-full">
+                                <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">{comments.length}</span>
+                            </div>
+                        </div>
+
+                        <div
+                            ref={scrollRef}
+                            className="space-y-8 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar flex flex-col-reverse"
+                        >
+                            {comments.length > 0 ? (
+                                comments.map((comment) => (
+                                    <div key={comment.id} className="flex gap-4 group/comment animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                        <Avatar className="h-9 w-9 shrink-0 border border-border/5">
+                                            <AvatarImage src={comment.user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user.id}`} />
+                                            <AvatarFallback className="bg-muted text-foreground text-xs">{comment.user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1 space-y-1">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-black text-foreground tracking-tight">{comment.user.username}</p>
+                                                <p className="text-[9px] text-muted-foreground font-bold uppercase opacity-30">
+                                                    {new Date(comment.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                </p>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground leading-relaxed font-bold opacity-80">{comment.content}</p>
+                                        </div>
+                                    </div>
+                                ))
                             ) : (
-                                <div className="flex flex-col items-center justify-center py-10 text-center space-y-4 opacity-30">
-                                    <MessageCircle className="h-10 w-10 text-gray-500" />
-                                    <p className="text-gray-500 font-black text-sm uppercase tracking-widest">No thoughts yet</p>
+                                <div className="flex flex-col items-center justify-center py-10 opacity-20 bg-foreground/5 rounded-[2rem] border border-dashed border-border/50">
+                                    <MessageCircle className="h-10 w-10 mb-2" />
+                                    <p className="text-xs font-black uppercase tracking-widest">No thoughts yet</p>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Quick Input */}
-                    <form onSubmit={handleAddComment} className="p-6 border-t border-white/5 bg-black/40 backdrop-blur-xl flex items-center gap-3">
-                        <Avatar className="h-10 w-10 border border-white/10 shrink-0 shadow-lg">
-                            <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=viewer`} />
-                            <AvatarFallback className="bg-white/5 text-white">U</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 relative group/input">
+                    {/* Floating Comment Box (Premium Design) */}
+                    <form
+                        onSubmit={handleAddComment}
+                        className="mt-12 group/input relative"
+                    >
+                        <div className="absolute inset-0 bg-neon-purple/20 blur-2xl opacity-0 group-focus-within/input:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                        <div className="relative flex items-center gap-3 bg-background-alt/40 border border-border/40 backdrop-blur-2xl rounded-3xl p-2 pl-4 shadow-2xl transition-all duration-500 group-focus-within/input:border-neon-purple/50 group-focus-within/input:bg-background-alt/60">
                             <input
                                 value={commentText}
                                 onChange={(e) => setCommentText(e.target.value)}
                                 placeholder="Share your thoughts..."
-                                className="w-full bg-white/5 border border-white/10 rounded-2xl h-12 pl-5 pr-12 text-sm text-white font-bold placeholder:text-gray-600 focus:outline-none focus:border-neon-purple/50 focus:bg-white/[0.08] transition-all"
+                                className="flex-1 bg-transparent border-none text-sm text-foreground font-bold placeholder:text-muted-foreground focus:outline-none py-3"
                             />
                             <button
                                 type="submit"
                                 disabled={!commentText.trim() || isPending}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-neon-purple hover:scale-110 disabled:opacity-30 disabled:hover:scale-100 transition-all font-bold"
+                                className={cn(
+                                    "h-10 w-10 flex items-center justify-center rounded-2xl transition-all duration-300",
+                                    commentText.trim() ? "bg-neon-gradient text-white shadow-lg active:scale-90" : "bg-foreground/5 text-muted-foreground opacity-30"
+                                )}
                             >
                                 <Send className="h-5 w-5" />
                             </button>
                         </div>
                     </form>
                 </div>
-            </div>
+            </main>
         </div>
     );
 }

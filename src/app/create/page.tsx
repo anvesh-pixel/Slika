@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 export default function CreatePage() {
     const router = useRouter();
-    const { uploadFile, isUploading } = useUpload();
+    const { uploadFile, isUploading, error: uploadError } = useUpload();
 
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
@@ -23,11 +23,14 @@ export default function CreatePage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target?.files?.[0];
+        const file = e.currentTarget.files?.[0];
         if (file) {
+            console.log("File selected:", file.name);
             const result = await uploadFile(file);
-            if (result.publicUrl) {
+            if (result?.publicUrl) {
                 setUploadedImageUrl(result.publicUrl);
+            } else if (result?.error) {
+                console.error("Upload error:", result.error);
             }
         }
     };
@@ -81,17 +84,17 @@ export default function CreatePage() {
     const isPublishDisabled = !title || !uploadedImageUrl || isUploading || isPublishing;
 
     return (
-        <div className="min-h-screen bg-black pt-24 pb-12 px-4 md:px-8">
+        <div className="min-h-screen bg-background text-foreground pt-20 md:pt-24 pb-12 px-4 md:px-8 transition-colors duration-[2000ms]">
             <div className="max-w-5xl mx-auto">
-                <div className="flex flex-col md:flex-row gap-12">
+                <div className="flex flex-col md:flex-row gap-8 md:gap-12">
 
                     {/* Left Column: Upload Area */}
                     <div className="md:w-1/2">
                         <div
                             className={cn(
-                                "relative aspect-[3/4] rounded-[40px] border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center overflow-hidden",
-                                dragActive ? "border-neon-purple bg-white/5" : "border-white/10 bg-[#0a0a0a]",
-                                uploadedImageUrl ? "border-solid border-white/5" : "hover:border-white/20"
+                                "relative aspect-[3/4] rounded-[32px] md:rounded-[40px] border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center overflow-hidden",
+                                dragActive ? "border-neon-purple bg-background-alt/50" : "border-border bg-background-alt shadow-inner",
+                                uploadedImageUrl ? "border-solid border-border" : "hover:border-foreground/20"
                             )}
                             onDragEnter={handleDrag}
                             onDragLeave={handleDrag}
@@ -100,22 +103,45 @@ export default function CreatePage() {
                             onClick={() => !uploadedImageUrl && fileInputRef.current?.click()}
                         >
                             {!uploadedImageUrl ? (
-                                <div className="text-center p-8 space-y-4 cursor-pointer">
-                                    <div className="h-20 w-20 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                                <div className="text-center p-6 md:p-8 space-y-4 w-full h-full flex flex-col items-center justify-center">
+                                    <div className="h-20 w-20 md:h-24 md:w-24 rounded-[24px] md:rounded-[32px] bg-muted border border-border flex items-center justify-center mb-4 md:mb-6 group-hover:scale-110 transition-all duration-500 shadow-2xl">
                                         {isUploading ? (
-                                            <Loader2 className="h-10 w-10 text-neon-purple animate-spin" />
+                                            <Loader2 className="h-8 w-8 md:h-10 md:w-10 text-neon-purple animate-spin" />
                                         ) : (
-                                            <Upload className="h-10 w-10 text-gray-400" />
+                                            <Upload className="h-8 w-8 md:h-10 md:w-10 text-gray-400 group-hover:text-neon-purple transition-colors" />
                                         )}
                                     </div>
-                                    <div>
-                                        <p className="text-xl font-bold text-white mb-2">
-                                            {isUploading ? "Uploading your masterpiece..." : "Choose a file or drag and drop"}
+                                    <div className="space-y-1 md:space-y-2">
+                                        <p className="text-xl md:text-2xl font-bold text-foreground tracking-tight">
+                                            {isUploading ? "Uploading..." : "Upload Media"}
                                         </p>
-                                        <p className="text-gray-500 font-medium">
-                                            We recommend high-quality .jpg or .png files under 20MB
+                                        <p className="text-muted-foreground text-sm md:text-base font-medium max-w-[240px] mx-auto line-clamp-2">
+                                            {isUploading
+                                                ? "Your file is being processed"
+                                                : <span className="hidden md:inline">or drag and drop your media here</span>}
                                         </p>
                                     </div>
+
+                                    {!isUploading && (
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            className="mt-4 md:mt-6 bg-muted hover:bg-muted/80 border-border rounded-xl px-6 h-10 md:h-12 font-bold text-foreground"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                fileInputRef.current?.click();
+                                            }}
+                                        >
+                                            Select Media
+                                        </Button>
+                                    )}
+
+                                    {uploadError && (
+                                        <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs md:text-sm font-medium animate-in fade-in slide-in-from-top-2">
+                                            {uploadError}
+                                        </div>
+                                    )}
+
                                     <input
                                         ref={fileInputRef}
                                         type="file"
@@ -153,28 +179,28 @@ export default function CreatePage() {
                     {/* Right Column: Form Area */}
                     <div className="md:w-1/2 space-y-10 py-4">
                         <div className="space-y-2">
-                            <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">Create New Pin</h1>
-                            <p className="text-gray-500 font-medium text-lg">Share your vision with the world.</p>
+                            <h1 className="text-4xl md:text-5xl font-bold text-foreground tracking-tight">Create New Pin</h1>
+                            <p className="text-muted-foreground font-medium text-lg">Share your vision with the world.</p>
                         </div>
 
                         <div className="space-y-8">
                             <div className="space-y-3">
-                                <label className="text-sm font-bold text-gray-400 uppercase tracking-widest ml-1">Title</label>
+                                <label className="text-sm font-bold text-muted-foreground uppercase tracking-widest ml-1">Title</label>
                                 <Input
                                     placeholder="Add a catchy title"
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
-                                    className="h-16 text-xl bg-white/5 border-white/10 rounded-2xl focus-visible:ring-neon-purple px-6 text-white placeholder:text-gray-600"
+                                    className="h-16 text-xl bg-background-alt border-border rounded-2xl focus-visible:ring-neon-purple px-6 text-foreground placeholder:text-muted-foreground"
                                 />
                             </div>
 
                             <div className="space-y-3">
-                                <label className="text-sm font-bold text-gray-400 uppercase tracking-widest ml-1">Description</label>
+                                <label className="text-sm font-bold text-muted-foreground uppercase tracking-widest ml-1">Description</label>
                                 <Textarea
                                     placeholder="Tell everyone what your Pin is about..."
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
-                                    className="min-h-[160px] text-lg bg-white/5 border-white/10 rounded-2xl focus-visible:ring-neon-purple p-6 text-white placeholder:text-gray-600 resize-none"
+                                    className="min-h-[160px] text-lg bg-background-alt border-border rounded-2xl focus-visible:ring-neon-purple p-6 text-foreground placeholder:text-muted-foreground resize-none"
                                 />
                             </div>
 
@@ -205,13 +231,13 @@ export default function CreatePage() {
                         </div>
 
                         {/* Extra Info / Tips */}
-                        <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 flex gap-6 items-start">
+                        <div className="p-8 rounded-[32px] bg-background-alt border border-border flex gap-6 items-start">
                             <div className="h-10 w-10 rounded-full bg-neon-purple/20 flex items-center justify-center shrink-0">
                                 <ImageIcon className="h-5 w-5 text-neon-purple" />
                             </div>
                             <div className="space-y-1">
-                                <p className="text-white font-bold">Pro Tip</p>
-                                <p className="text-gray-500 text-sm leading-relaxed">
+                                <p className="text-foreground font-bold">Pro Tip</p>
+                                <p className="text-muted-foreground text-sm leading-relaxed">
                                     High-resolution images with vertical aspect ratios (like 2:3 or 9:16) often perform better in the feed.
                                 </p>
                             </div>

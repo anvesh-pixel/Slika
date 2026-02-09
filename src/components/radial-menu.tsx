@@ -88,9 +88,9 @@ export default function LongPressRadialMenu({ onSelect, onClose, position }: Lon
                     initial={{ scale: 1 }}
                     animate={{ scale: [1, 1.2, 1] }}
                     transition={{ repeat: Infinity, duration: 2 }}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 h-10 w-10 bg-white/20 rounded-full border border-white/40 backdrop-blur-sm"
+                    className="absolute -translate-x-1/2 -translate-y-1/2 h-10 w-10 bg-foreground/10 rounded-full border border-foreground/20 backdrop-blur-sm"
                 />
-                <div className="absolute -translate-x-1/2 -translate-y-1/2 h-2 w-2 bg-white rounded-full shadow-[0_0_15px_white]" />
+                <div className="absolute -translate-x-1/2 -translate-y-1/2 h-2 w-2 bg-foreground rounded-full shadow-[0_0_15px_var(--foreground)]" />
 
                 {/* Options in 90-degree Arc (Left to Top) */}
                 {options.map((opt, index) => {
@@ -115,9 +115,9 @@ export default function LongPressRadialMenu({ onSelect, onClose, position }: Lon
                         >
                             <div
                                 className={cn(
-                                    "h-12 w-12 rounded-full flex items-center justify-center text-white transition-all shadow-lg backdrop-blur-lg border border-white/20",
-                                    isActive ? opt.color : "bg-black/50",
-                                    isActive ? "shadow-[0_0_25px_rgba(255,255,255,0.4)] border-white/60" : ""
+                                    "h-12 w-12 rounded-full flex items-center justify-center text-white transition-all shadow-lg backdrop-blur-lg border border-border",
+                                    isActive ? opt.color : "bg-muted/80",
+                                    isActive ? "shadow-[0_0_25px_rgba(255,255,255,0.4)] border-foreground/60" : ""
                                 )}
                             >
                                 {opt.icon}
@@ -128,7 +128,7 @@ export default function LongPressRadialMenu({ onSelect, onClose, position }: Lon
                                         initial={{ opacity: 0, y: 5, scale: 0.8 }}
                                         animate={{ opacity: 1, y: 0, scale: 1 }}
                                         exit={{ opacity: 0, y: 5 }}
-                                        className="px-3 py-1 bg-black/90 rounded-full text-[10px] font-bold text-white uppercase tracking-tighter whitespace-nowrap border border-white/10 shadow-xl"
+                                        className="px-3 py-1 bg-background/90 rounded-full text-[10px] font-bold text-foreground uppercase tracking-tighter whitespace-nowrap border border-border shadow-xl"
                                     >
                                         {opt.label}
                                     </motion.span>
@@ -139,7 +139,7 @@ export default function LongPressRadialMenu({ onSelect, onClose, position }: Lon
                 })}
 
                 {/* Arc Hint Visual */}
-                <div className="absolute -translate-x-1/2 -translate-y-1/2 h-48 w-48 rounded-full border-t-2 border-l-2 border-white/10 -z-10"
+                <div className="absolute -translate-x-1/2 -translate-y-1/2 h-48 w-48 rounded-full border-t-2 border-l-2 border-border -z-10"
                     style={{ borderRadius: '100% 0 0 0', transform: 'translate(-100%, -100%)' }} />
             </motion.div>
         </AnimatePresence>
